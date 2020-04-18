@@ -1,13 +1,11 @@
 import github.CachedGithubApi
-import github.GithubApiImpl
-import github.GithubCache
-import github.Repository
 
 fun main() {
-    CachedGithubApi().use {
-        it.getPublicJavaRepositories().take(50).forEach { println(it) }
+    CachedGithubApi().use { api ->
+        api.getPublicJavaRepositories().take(50)
+            .onEach(::println)
+            .flatMap { api.getRepositoryFiles(it) }
+            .filter { it.isJava }
+            .forEach(::println)
     }
-
-//    val api = GithubApiImpl()
-//    api.getPublicRepositories().filter { it.isJava }.take(150).forEach { println(it.name) }
 }
