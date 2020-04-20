@@ -4,9 +4,8 @@ import com.beust.klaxon.Json
 import com.beust.klaxon.Klaxon
 import java.io.IOException
 
-data class File(val path: String) {
+data class File(val path: String, @Json(name = "url") val contentUrl: String) {
     @Json(ignored = true) val isJava: Boolean get() = path.endsWith(".java")
-//    val content: String = ""
 }
 
 data class Repository(

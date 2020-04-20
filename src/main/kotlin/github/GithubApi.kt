@@ -3,11 +3,13 @@ package github
 import com.beust.klaxon.JsonReader
 import com.beust.klaxon.Klaxon
 import java.io.Closeable
+import java.util.*
 
 
 interface GithubApi {
     fun getPublicJavaRepositories(): Sequence<Repository>
     fun getRepositoryFiles(repo: Repository): Sequence<File>
+    fun getFileContent(file: File): String
 }
 
 class GithubApiImpl : GithubApi {
@@ -41,6 +43,12 @@ class GithubApiImpl : GithubApi {
 
         return files.asSequence()
     }
+
+    override fun getFileContent(file: File): String {
+        val conn = GithubConnector.requestUrl(file.contentUrl)
+
+        return String(Base64.getDecoder().decode(Klaxon().parseJsonObject(conn.reader).string("content")!!.replace("\n", "")))
+    }
 }
 
 class CachedGithubApi : GithubApi, Closeable {
@@ -62,6 +70,16 @@ class CachedGithubApi : GithubApi, Closeable {
         } else {
             api.getRepositoryFiles(repo)
                 .onEach { cache.addFile(repo, it) }
+        }
+    }
+
+    override fun getFileContent(file: File): String {
+        return if (cache.hasContent(file)) {
+            cache.getContent(file)
+        } else {
+            val result = api.getFileContent(file)
+            cache.setContent(file, result)
+            return result
         }
     }
 

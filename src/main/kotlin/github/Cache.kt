@@ -1,20 +1,66 @@
 package github
 
+import com.beust.klaxon.Json
 import com.beust.klaxon.Klaxon
 import java.io.Closeable
 import java.time.Duration
 import java.time.Instant
 
-class RepositoriesValue(var expiration: Instant, var content: MutableList<Repository>)
-class FilesValue(var expiration: Instant, var content: MutableList<File>)
+interface CacheValue<T> {
+    val expirationDuration: Duration
+    var expiration: Instant
+    var content: T
+    @Json(ignored = true) val expired: Boolean get() = expiration <= Instant.now()
+
+    fun hasValue() = !expired
+    fun getValue(): T = if (hasValue()) content else throw IllegalStateException()
+    fun setValue(value: T) {
+        content = value
+        resetExpiration()
+    }
+    fun resetExpiration() {
+        expiration = Instant.now() + expirationDuration
+    }
+}
+
+interface ListCacheValue<T>: CacheValue<MutableList<T>> {
+    fun addValue(value: T) {
+        if (!hasValue()) {
+            setValue(mutableListOf())
+        }
+        content.add(value)
+    }
+}
+
+interface MappedCacheValue<C : CacheValue<T>, T> {
+    var content: MutableMap<String, C>
+
+    fun hasValue(key: String): Boolean = !(content.getOrDefault(key, null)?.expired ?: true)
+    fun getValue(key: String) = if (hasValue(key)) content[key]!!.getValue() else throw IllegalStateException()
+    fun setValue(key: String, value: C) {
+        content[key] = value
+    }
+}
+
+class RepositoriesValue(override var expiration: Instant = Instant.MIN, override var content: MutableList<Repository> = mutableListOf()) : ListCacheValue<Repository> {
+    @Json(ignored = true) override val expirationDuration: Duration = Duration.ofDays(30)
+}
+class FilesValue(override var expiration: Instant = Instant.MIN, override var content: MutableList<File> = mutableListOf()) : ListCacheValue<File> {
+    @Json(ignored = true) override val expirationDuration: Duration = Duration.ofDays(7)
+}
+class StringValue(override var expiration: Instant = Instant.MIN, override var content: String = "") : CacheValue<String> {
+    @Json(ignored = true) override val expirationDuration: Duration = Duration.ofDays(7)
+}
+class MappedFilesValue(override var content: MutableMap<String, FilesValue>): MappedCacheValue<FilesValue, MutableList<File>>
+class MappedFileContentValue(override var content: MutableMap<String, StringValue>): MappedCacheValue<StringValue, String>
 
 data class CacheContainer(
     var repositories: RepositoriesValue? = null,
-    var files: MutableMap<String, FilesValue?>? = null)
+    var files: MappedFilesValue? = null,
+    var fileContent: MappedFileContentValue? = null)
 
 class GithubCache : Closeable {
     private val cacheFilename = "cache.json"
-    private val expirationTime: Long = 1_000_000 // Expiration time in seconds
     private val cacheFile = java.io.File(cacheFilename)
 
     init {
@@ -24,57 +70,41 @@ class GithubCache : Closeable {
         }
     }
 
-    private var cacheValues = Klaxon().converter(dateConverter).parse<CacheContainer>(cacheFile.reader())
+    private var cacheValues = Klaxon().converter(dateConverter).parse<CacheContainer>(cacheFile.reader()) ?: CacheContainer()
 
-    fun hasRepositories(): Boolean {
-        val repos = cacheValues?.repositories
-        val ok = repos != null && repos.expiration > Instant.now()
-        if (!ok) {
-            cacheValues?.repositories = null
-        }
-        return ok
-    }
-    fun getRepositories(): List<Repository> {
-        return if (hasRepositories()) {
-            cacheValues!!.repositories!!.content
-        } else {
-            throw IllegalStateException()
-        }
-    }
+    fun hasRepositories(): Boolean = cacheValues.repositories?.hasValue() ?: false
+    fun getRepositories(): List<Repository> = cacheValues.repositories?.getValue() ?: throw IllegalStateException()
     fun addRepository(value: Repository) {
-        if (!hasRepositories()) {
-            val expirationInstant = Instant.now() + Duration.ofSeconds(expirationTime)
-            cacheValues!!.repositories = RepositoriesValue(expirationInstant, mutableListOf())
-        }
-        cacheValues!!.repositories!!.content.add(value)
+        if (cacheValues.repositories == null)
+            cacheValues.repositories = RepositoriesValue()
+        cacheValues.repositories?.addValue(value)
     }
 
-    fun hasFiles(repo: Repository): Boolean {
-        val key = repo.name
-        val filesList = cacheValues?.files?.getOrDefault(key, null)
-        val ok = filesList != null && filesList.expiration > Instant.now()
-        if (!ok) {
-            cacheValues?.files?.set(key, null)
-        }
-        return ok
-    }
-    fun getFiles(repo: Repository): List<File> {
-        return if (hasFiles(repo)) {
-            cacheValues!!.files!![repo.name]!!.content
-        } else {
-            throw IllegalStateException()
-        }
-    }
+    private fun filesKey(repo: Repository) = repo.name
+    fun hasFiles(repo: Repository): Boolean = cacheValues.files?.hasValue(filesKey(repo)) ?: false
+    fun getFiles(repo: Repository): List<File> = cacheValues.files?.getValue(filesKey(repo)) ?: throw IllegalStateException()
     fun addFile(repo: Repository, file: File) {
-        val key = repo.name
-        if (!hasFiles(repo)) {
-            if (cacheValues?.files == null) {
-                cacheValues?.files = mutableMapOf()
-            }
-            val expirationInstant = Instant.now() + Duration.ofSeconds(expirationTime)
-            cacheValues?.files!![key] = FilesValue(expirationInstant, mutableListOf())
+        if (cacheValues.files == null) {
+            cacheValues.files = MappedFilesValue(mutableMapOf())
         }
-        cacheValues!!.files!![key]!!.content.add(file)
+        if (!hasFiles(repo)) {
+            val newValue = FilesValue()
+            newValue.resetExpiration()
+            cacheValues.files?.setValue(filesKey(repo), newValue)
+        }
+        cacheValues.files?.content?.get(filesKey(repo))?.addValue(file)
+    }
+
+    private fun contentKey(file: File) = file.contentUrl
+    fun hasContent(file: File): Boolean = cacheValues.fileContent?.hasValue(contentKey(file)) ?: false
+    fun getContent(file: File): String = cacheValues.fileContent?.getValue(contentKey(file)) ?: throw IllegalStateException()
+    fun setContent(file: File, content: String) {
+        if (cacheValues.fileContent == null) {
+            cacheValues.fileContent = MappedFileContentValue(mutableMapOf())
+        }
+        val newValue = StringValue(content=content)
+        newValue.resetExpiration()
+        cacheValues.fileContent?.setValue(contentKey(file), newValue)
     }
 
     override fun close() {
