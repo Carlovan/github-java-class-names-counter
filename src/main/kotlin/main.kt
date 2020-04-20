@@ -1,11 +1,22 @@
+import com.github.javaparser.JavaParser
 import github.CachedGithubApi
 
 fun main() {
-    CachedGithubApi().use { api ->
-        api.getPublicJavaRepositories().take(50)
-            .onEach(::println)
-            .flatMap { api.getRepositoryFiles(it) }
+    val outcome = CachedGithubApi().use { api ->
+        val parser = JavaParser()
+        api.getPublicJavaRepositories()
+            .take(50)
+            .flatMap(api::getRepositoryFiles)
             .filter { it.isJava }
-            .forEach(::println)
+            .map(api::getFileContent)
+            .mapNotNull { code ->
+                parser.parse(code).result.orElse(null)?.types
+                    ?.mapNotNull { it.toClassOrInterfaceDeclaration().orElse(null) }
+                    ?.filter { !it.isInterface }
+                    ?.map { it.nameAsString }
+            }
+            .flatMap { it.asSequence() }
+            .count()
     }
+    println(outcome)
 }
