@@ -8,20 +8,43 @@ import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import kotlin.math.max
 
+/**
+ * This function sleeps until the given [Instant] is reached
+ */
 fun waitUntil(instant: Instant) {
-    Thread.sleep(max(0, Instant.now().until(instant, ChronoUnit.MILLIS) + 1000))
+    Thread.sleep(max(0, Instant.now().until(instant, ChronoUnit.MILLIS)))
 }
 
+/**
+ * Object used to make requests to the Github API
+ *
+ * This object handles the authentication to the API, the possible errors returned and similar connection-related stuff
+ */
 object GithubConnector {
     private const val BASE_URL = "https://api.github.com"
-    private const val AUTH = "0691a72ef6a0fe2d3400b905eb8b94b14a028286"
+    private const val AUTH = "0691a72ef6a0fe2d3400b905eb8b94b14a028286" // TODO
 
+    /**
+     * Creates a URL to Github API given the path
+     */
     fun createUrl(path: String) = "$BASE_URL/$path"
+
+    /**
+     * Requests a URL from Github API given only the path
+     */
+    fun request(path: String) = requestUrl(createUrl(path))
+
+    /**
+     * Requests the given URL from Github API.
+     *
+     * @throws IOException if something goes wrong while connecting
+     * @return a connected [HttpURLConnection]
+     */
     fun requestUrl(url: String): HttpURLConnection {
         val conn = URL(url).openConnection() as HttpURLConnection
         conn.setRequestProperty("Authorization", "token $AUTH")
         var retryConnection: Boolean
-        do {
+        do { // Some errors are temporary may need retrying
             retryConnection = false
             try {
                 conn.connect()
@@ -46,5 +69,4 @@ object GithubConnector {
         } while(retryConnection)
         return conn
     }
-    fun request(path: String) = requestUrl(createUrl(path))
 }
