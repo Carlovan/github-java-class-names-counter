@@ -20,23 +20,30 @@ object GithubConnector {
     fun requestUrl(url: String): HttpURLConnection {
         val conn = URL(url).openConnection() as HttpURLConnection
         conn.setRequestProperty("Authorization", "token $AUTH")
-        conn.connect()
-        try {
-            val remainingRequests = conn.getHeaderFieldInt("X-Ratelimit-Remaining", 0)
-            if (remainingRequests <= 0) {
-                val resetInstant = Instant.ofEpochSecond(conn.getHeaderFieldLong("X-RateLimit-Reset", 0))
-                println("Waiting until ${resetInstant.atZone(ZoneId.systemDefault())} for rate limit")
-                waitUntil(resetInstant)
+        var retryConnection: Boolean
+        do {
+            retryConnection = false
+            try {
+                conn.connect()
+                when (conn.responseCode) {
+                    HttpURLConnection.HTTP_FORBIDDEN -> {
+                        val remainingRequests = conn.getHeaderFieldInt("X-Ratelimit-Remaining", -1)
+                        if (remainingRequests == 0) {
+                            retryConnection = true
+                            val resetInstant = Instant.ofEpochSecond(conn.getHeaderFieldLong("X-RateLimit-Reset", 0))
+                            println("Waiting until ${resetInstant.atZone(ZoneId.systemDefault())} for rate limit")
+                            waitUntil(resetInstant)
+                        }
+                    }
+                    HttpURLConnection.HTTP_OK -> {}
+                    else -> throw IOException("URL $url returned response ${conn.responseCode} ${conn.responseMessage}. Body is ${conn.reader.readText()}")
+                }
+            } catch (error: IOException) {
+                val body = conn.errorStream?.bufferedReader()?.readText() ?: ""
+                println("${error.message}. $body")
+                throw error // Rethrow the exception to be handled by the calling method
             }
-            println("Remaining $remainingRequests requests")
-            if (conn.responseCode != 200) {
-                println("There was an error on URL $url: ${conn.responseMessage} ${conn.reader.readText()}")
-            }
-        } catch (e: IOException) {
-            println(e.message)
-            println(conn.errorStream?.bufferedReader()?.readText())
-            throw e
-        }
+        } while(retryConnection)
         return conn
     }
     fun request(path: String) = requestUrl(createUrl(path))
