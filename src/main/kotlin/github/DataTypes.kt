@@ -11,7 +11,8 @@ data class File(val path: String, @Json(name = "url") val contentUrl: String) {
 data class Repository(
     val id: Int,
     @Json(name="full_name") val name: String,
-    val languages_url: String) {
+    val languages_url: String,
+    val trees_url: String) {
     var isJava: Boolean by LazyWithSetter{
         val topLanguagesCount = 2
         try {
@@ -23,5 +24,4 @@ data class Repository(
             false
         }
     }
-//    val files: Sequence<File>
 }

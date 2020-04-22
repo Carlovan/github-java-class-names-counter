@@ -2,6 +2,7 @@ package github
 
 import com.beust.klaxon.JsonReader
 import com.beust.klaxon.Klaxon
+import com.damnhandy.uri.template.UriTemplate
 import java.io.Closeable
 import java.util.*
 
@@ -21,7 +22,11 @@ class GithubApiImpl : GithubApi {
     }
 
     override fun getRepositoryFiles(repo: Repository): Sequence<File> {
-        val conn = GithubConnector.request("repos/${repo.name}/git/trees/master?recursive=true")
+        val url = UriTemplate.fromTemplate(repo.trees_url)
+            .set("sha", "master")
+            .expand() + "?recursive=true"
+        println(url)
+        val conn = GithubConnector.requestUrl(url)
         val klaxon = Klaxon()
 
         val files = mutableListOf<File>()
