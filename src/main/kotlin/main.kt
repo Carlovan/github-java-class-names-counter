@@ -1,22 +1,28 @@
 import com.github.javaparser.JavaParser
 import github.CachedGithubApi
+import java.io.File
 
 fun main() {
     val outcome = CachedGithubApi().use { api ->
         val parser = JavaParser()
         api.getPublicJavaRepositories()
-            .take(50)
+            .onEach { println(it.name) }
             .flatMap(api::getRepositoryFiles)
             .filter { it.isJava }
             .map(api::getFileContent)
-            .mapNotNull { code ->
+            .mapNotNull { code -> // Get a list of class names for every file
                 parser.parse(code).result.orElse(null)?.types
                     ?.mapNotNull { it.toClassOrInterfaceDeclaration().orElse(null) }
                     ?.filter { !it.isInterface }
                     ?.map { it.nameAsString }
             }
             .flatMap { it.asSequence() }
-            .count()
+            .groupingBy { it }
+            .eachCount()
+            .entries
+            .sortedByDescending { it.value }
     }
-    println(outcome)
+    val outFile = File("output.csv")
+    outFile.writeText("Name,Count\n")
+    outcome.forEach {outFile.appendText("\"${it.key}\",${it.value}\n")}
 }
