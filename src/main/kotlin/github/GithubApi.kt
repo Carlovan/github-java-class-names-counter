@@ -42,7 +42,6 @@ class GithubApiImpl : GithubApi {
         val url = UriTemplate.fromTemplate(repo.trees_url)
             .set("sha", "master")
             .expand() + "?recursive=true"
-        println(url)
         val conn = GithubConnector.requestUrl(url)
         val klaxon = Klaxon()
 
