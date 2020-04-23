@@ -85,7 +85,7 @@ data class CacheContainer(
  *
  * Saves data to disk when closed.
  */
-class GithubCache : Closeable {
+class GithubCache(ignoreRepositories: Boolean = false, ignoreFiles: Boolean = false, ignoreFilesContent: Boolean = false) : Closeable {
     private val cacheFilename = "cache.json"
     private val cacheFile = java.io.File(cacheFilename)
 
@@ -97,6 +97,18 @@ class GithubCache : Closeable {
     }
 
     private var cacheValues = Klaxon().converter(dateConverter).parse<CacheContainer>(cacheFile.reader()) ?: CacheContainer()
+
+    init {
+        if (ignoreRepositories) {
+            cacheValues.repositories = null
+        }
+        if (ignoreFiles) {
+            cacheValues.files = null
+        }
+        if (ignoreFilesContent) {
+            cacheValues.fileContent = null
+        }
+    }
 
     fun hasRepositories(): Boolean = cacheValues.repositories?.hasValue() ?: false
     fun getRepositories(): List<Repository> = cacheValues.repositories?.getValue() ?: throw IllegalStateException()

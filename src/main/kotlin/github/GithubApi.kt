@@ -83,8 +83,8 @@ class GithubApiImpl : GithubApi {
  * Cached data are returned if present, otherwise [GithubApiImpl] is used to retrieve them and then they are stored.
  * Cache data is written to disk only when [close] is called
  */
-class CachedGithubApi : GithubApi, Closeable {
-    private val cache = GithubCache()
+class CachedGithubApi(ignoreRepositories: Boolean = false, ignoreFiles: Boolean = false, ignoreFilesContent: Boolean = false) : GithubApi, Closeable {
+    private val cache = GithubCache(ignoreRepositories, ignoreFiles, ignoreFilesContent)
     private val api = GithubApiImpl()
 
     override fun getPublicJavaRepositories(): Sequence<Repository> {
