@@ -2,11 +2,21 @@ import com.github.javaparser.JavaParser
 import github.CachedGithubApi
 import java.io.File
 
+const val OUTPUT_FILE = "output.csv"
+
 fun main() {
+    var repoCount = 0
     val outcome = CachedGithubApi().use { api ->
+        var lastStringLen = 0
         val parser = JavaParser()
         api.getPublicJavaRepositories()
-            .onEach { println(it.name) }
+            .onEach {
+                print("\r" + " ".repeat(lastStringLen))
+                val output = "\rAnalyzing '${it.name}'..."
+                print(output)
+                lastStringLen = output.length
+                repoCount++
+            }
             .flatMap(api::getRepositoryFiles)
             .filter { it.isJava }
             .map(api::getFileContent)
@@ -22,7 +32,9 @@ fun main() {
             .entries
             .sortedByDescending { it.value }
     }
-    val outFile = File("output.csv")
+    println("\nDone. Analyzed $repoCount repositories")
+    val outFile = File(OUTPUT_FILE)
     outFile.writeText("Name,Count\n")
     outcome.forEach {outFile.appendText("\"${it.key}\",${it.value}\n")}
+    println("Written output file '$OUTPUT_FILE'")
 }
