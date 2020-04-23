@@ -39,30 +39,31 @@ class GithubApiImpl : GithubApi {
      * This could lead to truncated output, but the threshold is very high
      */
     override fun getRepositoryFiles(repo: Repository): Sequence<File> {
-        return sequence {
-            val url = UriTemplate.fromTemplate(repo.trees_url)
-                .set("sha", "master")
-                .expand() + "?recursive=true"
-            val conn = GithubConnector.requestUrl(url)
-            val klaxon = Klaxon()
+        val url = UriTemplate.fromTemplate(repo.trees_url)
+            .set("sha", "master")
+            .expand() + "?recursive=true"
+        println(url)
+        val conn = GithubConnector.requestUrl(url)
+        val klaxon = Klaxon()
 
-            JsonReader(conn.reader).use { reader ->
-                reader.beginObject {
-                    while (reader.hasNext()) {
-                        when (reader.nextName()) {
-                            "tree" -> {
-                                reader.beginArray {
-                                    while (reader.hasNext()) {
-                                        yield(klaxon.parse<File>(reader)!!)
-                                    }
-                                }
+        val files = mutableListOf<File>()
+        JsonReader(conn.reader).use {reader ->
+            reader.beginObject {
+                while (reader.hasNext()) {
+                    when(reader.nextName()) {
+                        "tree" -> {
+                            reader.beginArray {
+                                while(reader.hasNext())
+                                    files.add(klaxon.parse(reader)!!)
                             }
-                            "truncated" -> if (reader.nextBoolean()) println("Tree for ${repo.name} was truncated") // TODO handle truncated trees
                         }
+                        "truncated" -> if (reader.nextBoolean()) println("Tree for ${repo.name} was truncated")
                     }
                 }
             }
         }
+
+        return files.asSequence()
     }
 
     /**
