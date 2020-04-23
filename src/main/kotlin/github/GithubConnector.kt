@@ -41,10 +41,17 @@ object GithubConnector {
      * @return a connected [HttpURLConnection]
      */
     fun requestUrl(url: String): HttpURLConnection {
+        val retrySeconds = 5
+        var retryConnection = false
+        var retryCount = 5
+
         val conn = URL(url).openConnection() as HttpURLConnection
         conn.setRequestProperty("Authorization", "token $AUTH")
-        var retryConnection: Boolean
-        do { // Some errors are temporary may need retrying
+        do {
+            if (retryConnection) {
+                println("Retrying in $retrySeconds seconds...")
+                Thread.sleep(retrySeconds * 1000L)
+            }
             retryConnection = false
             try {
                 conn.connect()
@@ -59,13 +66,22 @@ object GithubConnector {
                         }
                     }
                     HttpURLConnection.HTTP_OK -> {}
-                    else -> throw IOException("URL $url returned response ${conn.responseCode} ${conn.responseMessage}. Body is ${conn.reader.readText()}")
+                    else -> {
+                        val msg = "URL $url returned response ${conn.responseCode} ${conn.responseMessage}. Body is ${conn.reader.readText()}"
+                        if (retryCount <= 0) {
+                            throw IOException(msg)
+                        } else {
+                            println(msg)
+                            retryConnection = true
+                        }
+                    }
                 }
             } catch (error: IOException) {
                 val body = conn.errorStream?.bufferedReader()?.readText() ?: ""
                 println("${error.message}. $body")
                 throw error // Rethrow the exception to be handled by the calling method
             }
+            retryCount--
         } while(retryConnection)
         return conn
     }
