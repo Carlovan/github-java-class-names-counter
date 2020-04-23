@@ -6,8 +6,11 @@ import java.io.Closeable
 import java.time.Duration
 import java.time.Instant
 
+/**
+ * Interface to represent a generic value stored in the cache
+ */
 interface CacheValue<T> {
-    val expirationDuration: Duration
+    val lifeDuration: Duration // This field is meant to allow every subclass to choose a specific expiration time
     var expiration: Instant
     var content: T
     @Json(ignored = true) val expired: Boolean get() = expiration <= Instant.now()
@@ -19,10 +22,15 @@ interface CacheValue<T> {
         resetExpiration()
     }
     fun resetExpiration() {
-        expiration = Instant.now() + expirationDuration
+        expiration = Instant.now() + lifeDuration
     }
 }
 
+/**
+ * Interface to represent a list of values stored in the cache
+ *
+ * The expiration time is set on the list, not on individual items
+ */
 interface ListCacheValue<T>: CacheValue<MutableList<T>> {
     fun addValue(value: T) {
         if (!hasValue()) {
@@ -32,6 +40,11 @@ interface ListCacheValue<T>: CacheValue<MutableList<T>> {
     }
 }
 
+/**
+ * Interface to represent a mapping between keys and values stored in the cache
+ *
+ * Every value can be accessed with a key. Every value has its own expiration time
+ */
 interface MappedCacheValue<C : CacheValue<T>, T> {
     var content: MutableMap<String, C>
 
@@ -42,23 +55,36 @@ interface MappedCacheValue<C : CacheValue<T>, T> {
     }
 }
 
+/*
+    These classes implements some cache-value interfaces.
+    This allows the deserializer to know every type at runtime (since these are real classes)
+    but still maintain type safety and flexibility with generic interfaces
+ */
 class RepositoriesValue(override var expiration: Instant = Instant.MIN, override var content: MutableList<Repository> = mutableListOf()) : ListCacheValue<Repository> {
-    @Json(ignored = true) override val expirationDuration: Duration = Duration.ofDays(30)
+    @Json(ignored = true) override val lifeDuration: Duration = Duration.ofDays(30)
 }
 class FilesValue(override var expiration: Instant = Instant.MIN, override var content: MutableList<File> = mutableListOf()) : ListCacheValue<File> {
-    @Json(ignored = true) override val expirationDuration: Duration = Duration.ofDays(7)
+    @Json(ignored = true) override val lifeDuration: Duration = Duration.ofDays(7)
 }
 class StringValue(override var expiration: Instant = Instant.MIN, override var content: String = "") : CacheValue<String> {
-    @Json(ignored = true) override val expirationDuration: Duration = Duration.ofDays(7)
+    @Json(ignored = true) override val lifeDuration: Duration = Duration.ofDays(7)
 }
 class MappedFilesValue(override var content: MutableMap<String, FilesValue>): MappedCacheValue<FilesValue, MutableList<File>>
 class MappedFileContentValue(override var content: MutableMap<String, StringValue>): MappedCacheValue<StringValue, String>
 
+/**
+ * Class representing the complete cache. Useful to be serialized
+ */
 data class CacheContainer(
     var repositories: RepositoriesValue? = null,
     var files: MappedFilesValue? = null,
     var fileContent: MappedFileContentValue? = null)
 
+/**
+ * This class allows access to the cache values with specific methods
+ *
+ * Saves data to disk when closed.
+ */
 class GithubCache : Closeable {
     private val cacheFilename = "cache.json"
     private val cacheFile = java.io.File(cacheFilename)

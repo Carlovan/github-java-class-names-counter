@@ -4,10 +4,16 @@ import com.beust.klaxon.Json
 import com.beust.klaxon.Klaxon
 import java.io.IOException
 
+/**
+ * Represents a file in a repository on Github
+ */
 data class File(val path: String, @Json(name = "url") val contentUrl: String) {
     @Json(ignored = true) val isJava: Boolean get() = path.endsWith(".java")
 }
 
+/**
+ * Represents a repository hosted on Github
+ */
 data class Repository(
     val id: Int,
     @Json(name="full_name") val name: String,
