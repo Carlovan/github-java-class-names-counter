@@ -34,8 +34,7 @@ class GithubApiImpl : GithubApi {
 
     /**
      * Returns all the files contained inside the given repository
-     * Only a single request is made using the "recursive" query parameter,
-     * but the JSON is parsed lazily (not really useful though).
+     * Only a single request is made using the "recursive" query parameter.
      * This could lead to truncated output, but the threshold is very high
      */
     override fun getRepositoryFiles(repo: Repository): Sequence<File> {
