@@ -45,9 +45,10 @@ object GithubConnector {
         var retryConnection = false
         var retryCount = 5
 
-        val conn = URL(url).openConnection() as HttpURLConnection
-        conn.setRequestProperty("Authorization", "token $AUTH")
+        var conn: HttpURLConnection
         do {
+            conn = URL(url).openConnection() as HttpURLConnection
+            conn.setRequestProperty("Authorization", "token $AUTH")
             if (retryConnection) {
                 println("Retrying in $retrySeconds seconds...")
                 Thread.sleep(retrySeconds * 1000L)
