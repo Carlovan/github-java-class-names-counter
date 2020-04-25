@@ -22,7 +22,12 @@ fun waitUntil(instant: Instant) {
  */
 object GithubConnector {
     private const val BASE_URL = "https://api.github.com"
-    private const val AUTH = "0691a72ef6a0fe2d3400b905eb8b94b14a028286" // TODO
+    private var noAuthWarned = false // Print a warning first time a request is made without authentication
+
+    /**
+     * Oauth token to use for authentication with GitHub API
+     */
+    var apiToken: String = ""
 
     /**
      * Creates a URL to Github API given the path
@@ -48,7 +53,11 @@ object GithubConnector {
         var conn: HttpURLConnection
         do {
             conn = URL(url).openConnection() as HttpURLConnection
-            conn.setRequestProperty("Authorization", "token $AUTH")
+            if (apiToken.isNotBlank()) {
+                conn.setRequestProperty("Authorization", "token $apiToken")
+            } else if (!noAuthWarned) {
+                println("WARNING! Using GitHub API without authentication token")
+            }
             if (retryConnection) {
                 println("Retrying in $retrySeconds seconds...")
                 Thread.sleep(retrySeconds * 1000L)

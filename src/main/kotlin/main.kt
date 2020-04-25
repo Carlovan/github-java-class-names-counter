@@ -1,10 +1,15 @@
 import com.github.javaparser.JavaParser
 import github.CachedGithubApi
+import github.GithubConnector
 import java.io.File
 
 const val OUTPUT_FILE = "output.csv"
 
-fun main() {
+fun main(args: Array<String>) {
+    println(args.joinToString())
+    if (args.isNotEmpty()) {
+        GithubConnector.apiToken = args[0]
+    }
     var repoCount = 0
     val outcome = CachedGithubApi().use { api ->
         val parser = JavaParser()

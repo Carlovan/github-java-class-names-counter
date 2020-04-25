@@ -26,8 +26,19 @@ Dependency libraries are used only to handle data or processes based on some kin
 * [**JavaParser**](https://javaparser.org/) is used to parse Java source code and extract class names
 
 ## Usage
-Execute `./gradlew run` to run the project.  
-It will create or update a cache file `cache.json` if necessary.  
-While running it will print the repositories being analyzed,
-and at the end it will write a file `output.csv` containing
+Execute `./gradlew run [--args="GitHub_token"]` to run the project.
+
+A cache file `cache.json` will be created or updated if necessary.  
+While running it will print the repositories being analyzed, and at the end it will write a file `output.csv` containing
 the number of times each class name has been encountered.
+
+### Github Authentication
+Since GitHub API applies strict limitation to unauthorized requests, is recommended to supply an [OAuth2 token](https://developer.github.com/apps/building-oauth-apps/authorizing-oauth-apps/)
+as the first parameter of the application. With Gradle this can be done as show above.
+
+### Cache
+Since there are **a lot** of repositories on GitHub, using a cache speeds up subsequent runs of the program.  
+An interrupted run will also be resumed from where it was left.
+
+Cached data are saved in a file called `cache.json`; if you want to clean the cache just remove that file.  
+Cache data is written to file every three retrieved repositories.
