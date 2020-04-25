@@ -10,7 +10,7 @@ import java.util.*
  * Methods useful to access Github API
  */
 interface GithubApi {
-    fun getPublicJavaRepositories(): Sequence<Repository>
+    fun getPublicJavaRepositories(since: Repository? = null): Sequence<Repository>
     fun getRepositoryFiles(repo: Repository): Sequence<File>
     fun getFileContent(file: File): String
 }
@@ -25,8 +25,8 @@ class GithubApiImpl : GithubApi {
      * Returns all the public Java-based repositories hosted on Github.
      * Requests are made lazily only when necessary
      */
-    override fun getPublicJavaRepositories(): Sequence<Repository> {
-        val pagination = PaginatedRequest("repositories")
+    override fun getPublicJavaRepositories(since: Repository?): Sequence<Repository> {
+        val pagination = PaginatedRequest("repositories" + if (since == null) "" else "?since=${since.id}")
         return generateSequence { pagination.next() }
             .flatMap { Klaxon().parseArray<Repository>(it)?.asSequence() ?: sequenceOf() }
             .filter { it.isJava }
@@ -86,13 +86,16 @@ class CachedGithubApi(ignoreRepositories: Boolean = false, ignoreFiles: Boolean 
     private val cache = GithubCache(ignoreRepositories, ignoreFiles, ignoreFilesContent)
     private val api = GithubApiImpl()
 
-    override fun getPublicJavaRepositories(): Sequence<Repository> {
-        return if (cache.hasRepositories()) {
-            cache.getRepositories().asSequence()
-        } else {
-            api.getPublicJavaRepositories()
-                .onEach { cache.addRepository(it) }
+    override fun getPublicJavaRepositories(since: Repository?): Sequence<Repository> {
+        var last: Repository? = null
+        var repos = sequenceOf<Repository>()
+        if (cache.hasRepositories()) {
+            val cached = cache.getRepositories()
+            last = cached.lastOrNull()
+            repos = cached.asSequence()
         }
+        return (repos.onEach { println("cached") } + api.getPublicJavaRepositories(last).onEach { cache.addRepository(it) }.onEach { println("requested") })
+            .dropWhile { it.id <= since?.id ?: -1 }
     }
 
     override fun getRepositoryFiles(repo: Repository): Sequence<File> {
