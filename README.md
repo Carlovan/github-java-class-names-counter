@@ -15,7 +15,8 @@ This is a [Gradle](https://gradle.org)-based project written in [Kotlin](https:/
 1. We the obtain the list of all files for every  repository and keep only the ones with `.java` extension.  
 1. Finally we can parse the source code to get the class names and count them.
 
-All the information is requested from the [GitHub API](https://developer.github.com/v3/) and saved in a cache for faster subsequent usage.
+All the information is requested from the [GitHub API](https://developer.github.com/v3/) and saved in a cache for faster subsequent usage.  
+Cache is automatically saved when the program terminates correctly and every three new repositories are stored.
 
 ### Dependencies
 Dependency libraries are used only to handle data or processes based on some kind of standard:
