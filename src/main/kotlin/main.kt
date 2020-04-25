@@ -7,15 +7,11 @@ const val OUTPUT_FILE = "output.csv"
 fun main() {
     var repoCount = 0
     val outcome = CachedGithubApi().use { api ->
-        var lastStringLen = 0
         val parser = JavaParser()
         api.getPublicJavaRepositories()
             .onEach {
-                print("\r" + " ".repeat(lastStringLen))
-                val output = "\rAnalyzing '${it.name}'..."
-                print(output)
-                lastStringLen = output.length
                 repoCount++
+                println("Analyzing [$repoCount] '${it.name}'...")
             }
             .flatMap(api::getRepositoryFiles)
             .filter { it.isJava }
