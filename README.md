@@ -26,11 +26,18 @@ Dependency libraries are used only to handle data or processes based on some kin
 * [**JavaParser**](https://javaparser.org/) is used to parse Java source code and extract class names
 
 ## Usage
-Execute `./gradlew run [--args="GitHub_token"]` to run the project.
+Execute `./gradlew run [--args="arguments..."]` to run the project.
 
 A cache file `cache.json` will be created or updated if necessary.  
 While running it will print the repositories being analyzed, and at the end it will write a file `output.csv` containing
 the number of times each class name has been encountered.
+
+### Arguments
+You can specify some command line arguments. If the same argument is present several times, the last one is used.
+
+* `--token=TOKEN`: GitHub auth token (see below)
+* `--ignore-cache=(all|repos|files)`: ignore some values from the cache (`all` = everything, `repos` = list of repositories,
+`files` = files list and content for every repository)
 
 ### Github Authentication
 Since GitHub API applies strict limitation to unauthorized requests, is recommended to supply an [OAuth2 token](https://developer.github.com/apps/building-oauth-apps/authorizing-oauth-apps/)

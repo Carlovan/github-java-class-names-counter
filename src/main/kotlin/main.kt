@@ -2,16 +2,29 @@ import com.github.javaparser.JavaParser
 import github.CachedGithubApi
 import github.GithubConnector
 import java.io.File
+import kotlin.system.exitProcess
 
 const val OUTPUT_FILE = "output.csv"
 
 fun main(args: Array<String>) {
-    println(args.joinToString())
-    if (args.isNotEmpty()) {
-        GithubConnector.apiToken = args[0]
+    val arguments = parseArguments(args.toList())
+    arguments.getOrDefault(Arguments.TOKEN, null)?.let {
+        GithubConnector.apiToken = it
     }
+
+    var ignoreCacheRepositories: Boolean
+    var ignoreCacheFiles: Boolean
+    getIgnoreCacheValue(arguments.getOrDefault(Arguments.IGNORE_CACHE, "")).let {
+        ignoreCacheRepositories = it in listOf(IgnoreCacheValues.REPOS, IgnoreCacheValues.ALL)
+        ignoreCacheFiles = it in listOf(IgnoreCacheValues.FILES, IgnoreCacheValues.ALL)
+        if (it == IgnoreCacheValues.WRONG) {
+            println("Invalid 'ignore-cache' value")
+            exitProcess(1)
+        }
+    }
+
     var repoCount = 0
-    val outcome = CachedGithubApi().use { api ->
+    val outcome = CachedGithubApi(ignoreCacheRepositories, ignoreCacheFiles, ignoreCacheFiles).use { api ->
         val parser = JavaParser()
         api.getPublicJavaRepositories()
             .onEach {
