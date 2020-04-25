@@ -76,6 +76,7 @@ class GithubApiImpl : GithubApi {
     }
 }
 
+const val SAVE_CHUNK_SIZE = 3 // Cache is saved every SAVE_CHUNK_SIZE analyzed repositories
 /**
  * This class allows accessing Github API and caching responses.
  *
@@ -94,7 +95,15 @@ class CachedGithubApi(ignoreRepositories: Boolean = false, ignoreFiles: Boolean 
             last = cached.lastOrNull()
             repos = cached.asSequence()
         }
-        return (repos.onEach { println("cached") } + api.getPublicJavaRepositories(last).onEach { cache.addRepository(it) }.onEach { println("requested") })
+        return (repos +
+                api.getPublicJavaRepositories(last)
+                    .onEach { cache.addRepository(it) }
+                    .onEachIndexed { index, _ ->
+                        if ((index + 1) % SAVE_CHUNK_SIZE == 0) {
+                            println("Cache saved")
+                            this.close()
+                        }
+                    })
             .dropWhile { it.id <= since?.id ?: -1 }
     }
 

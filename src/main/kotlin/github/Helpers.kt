@@ -25,6 +25,11 @@ val dateConverter = object: Converter {
 val HttpURLConnection.reader: Reader
     get() = inputStream.bufferedReader()
 
+fun <T> Sequence<T>.onEachIndexed(action: (Int, T) -> Unit) = this.mapIndexed { index, value ->
+    action(index, value)
+    value
+}
+
 /**
  * This class is useful to access paginated data from Github API.
  *

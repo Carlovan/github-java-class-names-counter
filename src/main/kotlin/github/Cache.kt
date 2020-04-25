@@ -85,7 +85,7 @@ data class CacheContainer(
  *
  * Saves data to disk when closed.
  */
-class GithubCache(ignoreRepositories: Boolean = false, ignoreFiles: Boolean = false, ignoreFilesContent: Boolean = false) : Closeable {
+class GithubCache(ignoreRepositories: Boolean = false, ignoreFiles: Boolean = false, ignoreFilesContent: Boolean = false) : AutoCloseable {
     private val cacheFilename = "cache.json"
     private val cacheFile = java.io.File(cacheFilename)
 
