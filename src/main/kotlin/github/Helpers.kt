@@ -3,6 +3,7 @@ package github
 import com.beust.klaxon.Converter
 import com.beust.klaxon.JsonValue
 import java.io.Reader
+import java.lang.IllegalStateException
 import java.net.HttpURLConnection
 import java.time.Instant
 import kotlin.properties.ReadWriteProperty
@@ -36,21 +37,23 @@ fun <T> Sequence<T>.onEachIndexed(action: (Int, T) -> Unit) = this.mapIndexed { 
  * The path given to the constructor is used to get the first page,
  * then the `Link` header is used to determine subsequent URLs.
  */
-class PaginatedRequest(path: String) {
+class PaginatedRequest(path: String): Iterator<Reader> {
     private var nextLink: String? = GithubConnector.createUrl(path)
 
     /**
      * Returns the next page of data
      */
-    fun next(): Reader? {
+    override fun next(): Reader {
         if (nextLink == null)
-            return null
+            throw IllegalStateException()
         val connection =  GithubConnector.requestUrl(nextLink!!)
         nextLink = Regex("""\s*<(.*?)>;\s*rel="next"""")
             .find(connection.getHeaderField("Link"))
             ?.groupValues?.getOrNull(1)
         return connection.reader
     }
+
+    override fun hasNext() = nextLink != null
 }
 
 /**

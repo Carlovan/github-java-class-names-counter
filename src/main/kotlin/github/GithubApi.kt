@@ -27,7 +27,7 @@ class GithubApiImpl : GithubApi {
      */
     override fun getPublicJavaRepositories(since: Repository?): Sequence<Repository> {
         val pagination = PaginatedRequest("repositories" + if (since == null) "" else "?since=${since.id}")
-        return generateSequence { pagination.next() }
+        return pagination.asSequence()
             .flatMap { Klaxon().parseArray<Repository>(it)?.asSequence() ?: sequenceOf() }
             .filter { it.isJava }
     }
@@ -51,8 +51,12 @@ class GithubApiImpl : GithubApi {
                     when(reader.nextName()) {
                         "tree" -> {
                             reader.beginArray {
-                                while(reader.hasNext())
-                                    files.add(klaxon.parse(reader)!!)
+                                while(reader.hasNext()) {
+                                    val obj = reader.nextObject()
+                                    if (obj.getOrDefault("type", "") == "blob") {
+                                        files.add(klaxon.parseFromJsonObject(obj)!!)
+                                    }
+                                }
                             }
                         }
                         "truncated" -> if (reader.nextBoolean()) println("Tree for ${repo.name} was truncated")
